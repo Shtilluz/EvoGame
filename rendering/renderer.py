@@ -1,4 +1,5 @@
 # rendering/renderer.py — отрисовка мира и информационной панели
+import math
 import pygame
 
 from constants import (
@@ -11,9 +12,134 @@ from simulation.core import Simulation
 from ui.slider import Slider
 
 
+def draw_hall_of_fame(screen, sim: Simulation, layout: Layout, fonts) -> pygame.Rect:
+    """Экран зала славы после полного вымирания. Возвращает Rect кнопки рестарта."""
+    fs, fm, fb = fonts
+    sw, sh = screen.get_size()
+    cx = sw // 2
+
+    # Тёмная подложка
+    overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
+    overlay.fill((4, 4, 14, 240))
+    screen.blit(overlay, (0, 0))
+
+    y = 26
+
+    # Заголовок
+    title_s = fb.render("МИР ОПУСТЕЛ", True, (220, 70, 70))
+    screen.blit(title_s, (cx - title_s.get_width() // 2, y))
+    y += title_s.get_height() + 8
+
+    sub_s = fm.render(
+        f"Тик {sim.tick}   ·   "
+        f"Видообразований: {sim.total_speciations}   ·   "
+        f"Убийств: {sim.total_kills}   ·   "
+        f"Рождений: {sim.total_births_h + sim.total_births_p + sim.total_births_s + sim.total_births_o}",
+        True, (140, 140, 170))
+    screen.blit(sub_s, (cx - sub_s.get_width() // 2, y))
+    y += sub_s.get_height() + 16
+
+    hall_s = fb.render("З А Л   С Л А В Ы", True, (200, 170, 55))
+    screen.blit(hall_s, (cx - hall_s.get_width() // 2, y))
+    y += hall_s.get_height() + 14
+
+    top = sim.top_species(10)
+
+    if not top:
+        msg = fm.render("Реестр пуст — слишком быстрое вымирание.", True, GRAY)
+        screen.blit(msg, (cx - msg.get_width() // 2, y + 40))
+    else:
+        margin = 36
+        table_w = sw - margin * 2
+
+        # Пропорциональные ширины колонок
+        col_ratios = [42, 200, 110, 54, 70, 54, 70, 130, 62]
+        ratio_total = sum(col_ratios)
+        col_ws = [int(r * table_w / ratio_total) for r in col_ratios]
+        col_xs = [margin]
+        for w in col_ws[:-1]:
+            col_xs.append(col_xs[-1] + w)
+
+        headers = ["#", "ВИД", "ТИП", "Пик", "Тиков", "Пок.", "Убийств", "Ск/Зр/Рз", "Очки"]
+        for hdr, hx in zip(headers, col_xs):
+            hs = fs.render(hdr, True, (170, 170, 210))
+            screen.blit(hs, (hx, y))
+        y += fs.get_height() + 4
+        pygame.draw.line(screen, (80, 80, 100), (margin, y), (sw - margin, y))
+        y += 5
+
+        kind_colors = {
+            'herb': (80, 220, 80),
+            'pred': (220, 70, 70),
+            'scav': (165, 115, 45),
+            'omni': (200, 180, 55),
+        }
+        row_h = fs.get_height() + 7
+
+        for rank, rec in enumerate(top, 1):
+            if y + row_h > sh - 90:
+                break
+
+            # Чередование строк
+            if rank % 2 == 0:
+                row_bg = pygame.Surface((table_w, row_h), pygame.SRCALPHA)
+                row_bg.fill((255, 255, 255, 12))
+                screen.blit(row_bg, (margin, y))
+
+            row_color = (240, 200, 60) if rank == 1 else (210, 210, 210) if rank <= 3 else (160, 160, 165)
+            kc = kind_colors.get(rec.kind, WHITE)
+
+            # Цветной квадрат вида
+            sw_rect = pygame.Rect(col_xs[0], y + 1, 16, row_h - 4)
+            pygame.draw.rect(screen, tuple(min(255, v) for v in rec.color[:3]), sw_rect, border_radius=3)
+            pygame.draw.rect(screen, (200, 200, 200), sw_rect, 1, border_radius=3)
+
+            def cell(text, xi, color):
+                s = fs.render(str(text), True, color)
+                screen.blit(s, (xi, y))
+
+            cell(str(rank), col_xs[0] + 20, row_color)
+            cell(rec.name[:24], col_xs[1], row_color)
+            cell(rec.kind_label, col_xs[2], kc)
+            cell(rec.peak_pop, col_xs[3], WHITE)
+            cell(rec.lifespan, col_xs[4], LIGHT_GRAY)
+            cell(rec.best_generation, col_xs[5], CYAN)
+            cell(rec.total_kills, col_xs[6], ORANGE)
+            cell(f"{rec.avg_speed:.1f} / {rec.avg_vision:.1f} / {rec.avg_size:.1f}", col_xs[7], LIGHT_GRAY)
+            cell(rec.score, col_xs[8], GOLD)
+
+            y += row_h
+
+    # Кнопка рестарта с пульсацией
+    btn_w, btn_h = 280, 46
+    btn_x = cx - btn_w // 2
+    btn_y = sh - btn_h - 28
+    btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+    pulse = int(abs(math.sin(pygame.time.get_ticks() / 700)) * 35)
+    btn_col = (50 + pulse, 130 + pulse // 2, 50 + pulse)
+    pygame.draw.rect(screen, btn_col, btn_rect, border_radius=9)
+    pygame.draw.rect(screen, WHITE, btn_rect, 2, border_radius=9)
+
+    btn_lbl = fb.render("ПЕРЕЗАПУСТИТЬ", True, WHITE)
+    screen.blit(btn_lbl, (cx - btn_lbl.get_width() // 2,
+                           btn_y + (btn_h - btn_lbl.get_height()) // 2))
+
+    hint = fs.render("или нажмите  R", True, (120, 120, 120))
+    screen.blit(hint, (cx - hint.get_width() // 2, btn_y + btn_h + 6))
+
+    return btn_rect
+
+
 def draw_all(screen, sim: Simulation, layout: Layout, fonts,
              speed_sl: Slider, param_sliders: list):
-    """Отрисовать весь кадр: мировое поле + информационная панель."""
+    """Отрисовать весь кадр: мировое поле + информационная панель.
+
+    Возвращает pygame.Rect кнопки рестарта если активен зал славы, иначе None.
+    """
+    if sim.game_over:
+        return draw_hall_of_fame(screen, sim, layout, fonts)
+
     fs, fm, fb = fonts
     L = layout
 

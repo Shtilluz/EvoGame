@@ -74,16 +74,6 @@ class Herbivore(Animal):
                     self.step_toward(ws.x, ws.y, cols, rows)
                 return None
 
-        # Стадное поведение
-        if self.herd_instinct > 0.15 and allies and self.energy > self.MAX_E * 0.35:
-            friends = [a for a in allies if a.alive and a != self and a.species_name == self.species_name]
-            friend, fd = self.nearest(friends, self.vision * 2.5)
-            if friend and fd > 5.0:
-                self.state = "в стаде"
-                if random.random() < self.herd_instinct:
-                    self.step_toward(friend.x, friend.y, cols, rows)
-                    return None
-
         # Охота на мелких хищников (только если всеядный/хищный рацион)
         if self.eats_animals and self.energy < self.MAX_E * 0.5:
             prey_list = [pr for pr in predators if pr.alive and self.size >= pr.size * 0.65]
@@ -116,8 +106,11 @@ class Herbivore(Animal):
                         self.step_toward(tgt.x, tgt.y, cols, rows)
                     return None
 
-        # Блуждание
+        # Блуждание + boids стадный дрейф
         self.state = "бродит"
+        if allies and self.herd_instinct > 0.05:
+            if self._steer_herd(allies, cols, rows):
+                self.state = "в стаде"
         self.wander()
         self.step(cols, rows)
         return None

@@ -58,8 +58,9 @@ def main():
                fmt=lambda v: f"{int(v)} мут.",      color=CYAN),
     ]
 
-    all_sliders = [speed_sl] + param_sliders
-    dragging    = None
+    all_sliders  = [speed_sl] + param_sliders
+    dragging     = None
+    restart_rect = None   # Rect кнопки рестарта в зале славы
 
     def apply_params():
         params.mutation_chance   = param_sliders[0].value / 100.0
@@ -96,6 +97,15 @@ def main():
 
             elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 mx, my = ev.pos
+
+                # Кнопка рестарта в зале славы
+                if sim.game_over and restart_rect and restart_rect.collidepoint(mx, my):
+                    sim = Simulation(layout)
+                    restart_rect = None
+                    continue
+
+                if sim.game_over:
+                    continue
 
                 # Переключение вкладок
                 if mx >= layout.panel_x and 50 <= my <= 85:
@@ -168,6 +178,7 @@ def main():
                     sim._log("Добавлено 5 падальщиков", BROWN)
                 elif k == pygame.K_r:
                     sim = Simulation(layout)
+                    restart_rect = None
 
         dt = clock.get_time() / 1000.0
         tick_acc += dt * BASE_TPS * speed_sl.value
@@ -177,8 +188,9 @@ def main():
             sim.update(params)
 
         screen.fill(BLACK)
-        draw_all(screen, sim, layout, fonts, speed_sl, param_sliders)
-        draw_legend(screen, layout, fonts[0])
+        restart_rect = draw_all(screen, sim, layout, fonts, speed_sl, param_sliders)
+        if not sim.game_over:
+            draw_legend(screen, layout, fonts[0])
         pygame.display.flip()
 
 

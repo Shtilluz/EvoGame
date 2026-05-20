@@ -74,16 +74,6 @@ class Scavenger(Animal):
                     self.step_toward(ws.x, ws.y, cols, rows)
                 return None
 
-        # Стайное поведение
-        if self.herd_instinct > 0.15 and allies and self.energy > self.MAX_E * 0.4:
-            friends = [a for a in allies if a.alive and a != self and a.species_name == self.species_name]
-            friend, fd = self.nearest(friends, self.vision * 2.5)
-            if friend and fd > 5.0:
-                self.state = "в стае"
-                if random.random() < self.herd_instinct:
-                    self.step_toward(friend.x, friend.y, cols, rows)
-                    return None
-
         # Поедание трупа (основная еда)
         if self.energy < self.MAX_E * 0.9 or self.fat < self.MAX_FAT * 0.95:
             live_corpses = [c for c in corpses
@@ -119,6 +109,9 @@ class Scavenger(Animal):
                 return None
 
         self.state = "рыщет"
+        if allies and self.herd_instinct > 0.05:
+            if self._steer_herd(allies, cols, rows):
+                self.state = "в стае"
         self.wander()
         self.step(cols, rows)
         return None

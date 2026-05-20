@@ -170,6 +170,72 @@ class Animal:
         return best, bd
 
     # ── Размножение ───────────────────────────────────────────────────────────
+    # ── Boids / стадное поведение ─────────────────────────────────────────────
+    def _boids(self, allies) -> tuple:
+        """Три силы boids для животных одного вида.
+
+        Возвращает (dx, dy, active):
+          dx/dy  — нормированный вектор руления к стае
+          active — True если стая найдена (изменить направление)
+        """
+        if self.herd_instinct < 0.05 or not allies:
+            return 0.0, 0.0, False
+
+        search_r = self.vision * (1.5 + self.herd_instinct)
+        friends = [a for a in allies
+                   if a.alive and a is not self
+                   and a.species_name == self.species_name
+                   and self.dist(a) < search_r]
+        if not friends:
+            return 0.0, 0.0, False
+
+        # Сепарация — отталкиваться от очень близких соседей
+        sep_x, sep_y = 0.0, 0.0
+        SEP_R = 2.5
+        for f in friends:
+            d = self.dist(f)
+            if d < SEP_R and d > 1e-4:
+                sep_x += (self.x - f.x) / (d * d)
+                sep_y += (self.y - f.y) / (d * d)
+
+        # Когезия — притяжение к центру масс
+        cx = sum(f.x for f in friends) / len(friends)
+        cy = sum(f.y for f in friends) / len(friends)
+        dc = self.dist_xy(cx, cy)
+        if dc > 1e-4:
+            coh_x = (cx - self.x) / dc
+            coh_y = (cy - self.y) / dc
+        else:
+            coh_x, coh_y = 0.0, 0.0
+
+        # Выравнивание — среднее направление соседей
+        ali_x = sum(f.dx for f in friends) / len(friends)
+        ali_y = sum(f.dy for f in friends) / len(friends)
+        am = math.hypot(ali_x, ali_y)
+        if am > 1e-4:
+            ali_x /= am; ali_y /= am
+
+        hi = self.herd_instinct
+        fx = sep_x * 1.5 + coh_x * hi * 1.2 + ali_x * hi * 0.5
+        fy = sep_y * 1.5 + coh_y * hi * 1.2 + ali_y * hi * 0.5
+        fm = math.hypot(fx, fy)
+        if fm < 1e-4:
+            return 0.0, 0.0, True
+        return fx / fm, fy / fm, True
+
+    def _steer_herd(self, allies, cols: int, rows: int):
+        """Применить boids к текущему направлению и сделать шаг. Возвращает True если активно."""
+        hx, hy, active = self._boids(allies)
+        if not active:
+            return False
+        blend = self.herd_instinct * 0.65
+        self.dx = self.dx * (1 - blend) + hx * blend
+        self.dy = self.dy * (1 - blend) + hy * blend
+        m = math.hypot(self.dx, self.dy)
+        if m > 1e-4:
+            self.dx /= m; self.dy /= m
+        return True
+
     def can_reproduce(self) -> bool:
         return (self.energy > self.MAX_E * 0.65
                 and self.hydration > 45

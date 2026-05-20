@@ -13,6 +13,53 @@ from world import Plant, WaterSource, Corpse
 from animals import Herbivore, Predator, Scavenger, Omnivore
 
 
+_KIND_LABEL = {
+    'herb': 'Травоядное',
+    'pred': 'Хищник',
+    'scav': 'Падальщик',
+    'omni': 'Всеядное',
+}
+
+
+class SpeciesRecord:
+    """Пожизненная статистика одного вида."""
+
+    __slots__ = [
+        'name', 'kind', 'color', 'first_tick', 'last_seen',
+        'peak_pop', 'total_births', 'total_kills', 'best_generation',
+        'avg_speed', 'avg_vision', 'avg_size', 'avg_diet', 'avg_endurance',
+    ]
+
+    def __init__(self, name: str, kind: str, color: list, tick: int):
+        self.name           = name
+        self.kind           = kind
+        self.color          = list(color)
+        self.first_tick     = tick
+        self.last_seen      = tick
+        self.peak_pop       = 0
+        self.total_births   = 0
+        self.total_kills    = 0
+        self.best_generation = 1
+        self.avg_speed      = 0.0
+        self.avg_vision     = 0.0
+        self.avg_size       = 0.0
+        self.avg_diet       = 0.0
+        self.avg_endurance  = 0.0
+
+    @property
+    def kind_label(self) -> str:
+        return _KIND_LABEL.get(self.kind, '?')
+
+    @property
+    def lifespan(self) -> int:
+        return self.last_seen - self.first_tick
+
+    @property
+    def score(self) -> int:
+        """Очки успеха: чем дольше прожил и больше размножился — тем выше."""
+        return self.peak_pop * 8 + self.lifespan // 50 + self.best_generation * 3 + self.total_kills * 2
+
+
 class Simulation:
     """Главный класс симуляции. Хранит все объекты мира и управляет временным циклом."""
 
@@ -41,6 +88,8 @@ class Simulation:
         self.total_kills       = 0
         self.total_speciations = 0
         self.species_list      = {"herb": set(), "pred": set(), "scav": set(), "omni": set()}
+        self.species_registry: dict[str, SpeciesRecord] = {}
+        self.game_over         = False
         self.ui_tab            = "INFO"
         self.selected_animal   = None
         self._init()
@@ -276,6 +325,7 @@ class Simulation:
             for k in self.history:
                 if len(self.history[k]) > 120:
                     self.history[k].pop(0)
+            self._update_registry()
 
         for e in self.events:
             e[2] -= 1
@@ -290,3 +340,48 @@ class Simulation:
             self._log("Падальщики вымерли.", BROWN)
         if len(self.omnis) == 0 and self.tick % 600 == 0 and self.total_births_o > 0:
             self._log("Всеядные вымерли.", GOLD)
+
+        # Полное вымирание → зал славы
+        if (not self.game_over
+                and len(self.herbs) == 0 and len(self.preds) == 0
+                and len(self.scavs) == 0 and len(self.omnis) == 0
+                and self.tick > 300):
+            self._update_registry()
+            self.game_over = True
+
+    # ── Реестр видов ──────────────────────────────────────────────────────────
+    def _update_registry(self):
+        """Обновить статистику всех живых видов в реестре."""
+        groups = [
+            (self.herbs, 'herb'),
+            (self.preds, 'pred'),
+            (self.scavs, 'scav'),
+            (self.omnis, 'omni'),
+        ]
+        for population, kind in groups:
+            by_name: dict[str, list] = {}
+            for a in population:
+                by_name.setdefault(a.species_name, []).append(a)
+
+            for name, animals in by_name.items():
+                if name not in self.species_registry:
+                    self.species_registry[name] = SpeciesRecord(
+                        name, kind, animals[0].color, self.tick)
+                rec = self.species_registry[name]
+                rec.last_seen        = self.tick
+                rec.peak_pop         = max(rec.peak_pop, len(animals))
+                rec.total_kills      = max(rec.total_kills, sum(a.kills for a in animals))
+                rec.best_generation  = max(rec.best_generation,
+                                           max(a.generation for a in animals))
+                n = len(animals)
+                rec.avg_speed     = sum(a.speed     for a in animals) / n
+                rec.avg_vision    = sum(a.vision    for a in animals) / n
+                rec.avg_size      = sum(a.size      for a in animals) / n
+                rec.avg_diet      = sum(a.diet      for a in animals) / n
+                rec.avg_endurance = sum(a.endurance for a in animals) / n
+                rec.total_births  += len([a for a in animals if a.children > 0])
+
+    def top_species(self, n: int = 10) -> list:
+        """Топ N видов по очкам успеха, отсортированных по убыванию."""
+        return sorted(self.species_registry.values(),
+                      key=lambda r: r.score, reverse=True)[:n]
