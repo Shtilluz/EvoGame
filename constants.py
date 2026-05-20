@@ -20,6 +20,10 @@ CYAN       = ( 40, 200, 200)
 PINK       = (255, 120, 160)
 BROWN      = (160, 100,  35)
 GOLD       = (200, 160,  40)
+PANEL_SECTION = ( 18,  22,  42)   # elevated panel areas (headers, footer)
+PANEL_LINE    = ( 38,  44,  68)   # dividers and borders
+TEXT_DIM      = ( 96, 100, 126)   # secondary / dimmed text
+ACCENT        = ( 55, 100, 215)   # active-state accent (blue)
 
 # ─── Отрисовка ────────────────────────────────────────────────────────────────
 CELL = 8    # размер одной клетки мира в пикселях

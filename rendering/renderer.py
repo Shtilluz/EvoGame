@@ -4,7 +4,8 @@ import pygame
 
 from constants import (
     BLACK, WHITE, GRAY, LIGHT_GRAY, GREEN, RED, BLUE, BROWN, GOLD, ORANGE,
-    YELLOW, CYAN, PINK, LIGHT_BLUE, PANEL_BG, SEASONS, SEASON_TICKS,
+    YELLOW, CYAN, PINK, LIGHT_BLUE, PANEL_BG, PANEL_SECTION, PANEL_LINE,
+    TEXT_DIM, ACCENT, SEASONS, SEASON_TICKS,
     DIET_HERB_THRESH, DIET_CARN_THRESH, CELL,
 )
 from params import Layout
@@ -12,34 +13,34 @@ from simulation.core import Simulation
 from ui.slider import Slider
 
 
+# ─── Зал славы ────────────────────────────────────────────────────────────────
+
 def draw_hall_of_fame(screen, sim: Simulation, layout: Layout, fonts) -> pygame.Rect:
     """Экран зала славы после полного вымирания. Возвращает Rect кнопки рестарта."""
     fs, fm, fb = fonts
     sw, sh = screen.get_size()
     cx = sw // 2
 
-    # Тёмная подложка
     overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
-    overlay.fill((4, 4, 14, 240))
+    overlay.fill((4, 4, 14, 245))
     screen.blit(overlay, (0, 0))
 
-    y = 26
+    y = 22
 
-    # Заголовок
-    title_s = fb.render("МИР ОПУСТЕЛ", True, (220, 70, 70))
+    title_s = fb.render("М И Р   О П У С Т Е Л", True, (210, 60, 60))
     screen.blit(title_s, (cx - title_s.get_width() // 2, y))
     y += title_s.get_height() + 8
 
+    total_b = (sim.total_births_h + sim.total_births_p
+               + sim.total_births_s + sim.total_births_o)
     sub_s = fm.render(
-        f"Тик {sim.tick}   ·   "
-        f"Видообразований: {sim.total_speciations}   ·   "
-        f"Убийств: {sim.total_kills}   ·   "
-        f"Рождений: {sim.total_births_h + sim.total_births_p + sim.total_births_s + sim.total_births_o}",
-        True, (140, 140, 170))
+        f"Тик {sim.tick}   ·   Видообразований: {sim.total_speciations}"
+        f"   ·   Убийств: {sim.total_kills}   ·   Рождений: {total_b}",
+        True, (130, 132, 162))
     screen.blit(sub_s, (cx - sub_s.get_width() // 2, y))
     y += sub_s.get_height() + 16
 
-    hall_s = fb.render("З А Л   С Л А В Ы", True, (200, 170, 55))
+    hall_s = fb.render("З А Л   С Л А В Ы", True, (200, 168, 52))
     screen.blit(hall_s, (cx - hall_s.get_width() // 2, y))
     y += hall_s.get_height() + 14
 
@@ -51,55 +52,46 @@ def draw_hall_of_fame(screen, sim: Simulation, layout: Layout, fonts) -> pygame.
     else:
         margin = 36
         table_w = sw - margin * 2
-
-        # Пропорциональные ширины колонок
-        col_ratios = [42, 200, 110, 54, 70, 54, 70, 130, 62]
-        ratio_total = sum(col_ratios)
-        col_ws = [int(r * table_w / ratio_total) for r in col_ratios]
+        col_ratios = [44, 195, 108, 52, 68, 52, 68, 128, 60]
+        total_r = sum(col_ratios)
+        col_ws = [int(r * table_w / total_r) for r in col_ratios]
         col_xs = [margin]
         for w in col_ws[:-1]:
             col_xs.append(col_xs[-1] + w)
 
         headers = ["#", "ВИД", "ТИП", "Пик", "Тиков", "Пок.", "Убийств", "Ск/Зр/Рз", "Очки"]
         for hdr, hx in zip(headers, col_xs):
-            hs = fs.render(hdr, True, (170, 170, 210))
-            screen.blit(hs, (hx, y))
+            screen.blit(fs.render(hdr, True, (160, 162, 205)), (hx, y))
         y += fs.get_height() + 4
-        pygame.draw.line(screen, (80, 80, 100), (margin, y), (sw - margin, y))
-        y += 5
+        pygame.draw.line(screen, (60, 65, 98), (margin, y), (sw - margin, y))
+        y += 6
 
-        kind_colors = {
-            'herb': (80, 220, 80),
-            'pred': (220, 70, 70),
-            'scav': (165, 115, 45),
-            'omni': (200, 180, 55),
-        }
+        kind_colors = {'herb': GREEN, 'pred': RED, 'scav': BROWN, 'omni': GOLD}
         row_h = fs.get_height() + 7
 
         for rank, rec in enumerate(top, 1):
             if y + row_h > sh - 90:
                 break
-
-            # Чередование строк
             if rank % 2 == 0:
-                row_bg = pygame.Surface((table_w, row_h), pygame.SRCALPHA)
-                row_bg.fill((255, 255, 255, 12))
-                screen.blit(row_bg, (margin, y))
+                rb = pygame.Surface((table_w, row_h), pygame.SRCALPHA)
+                rb.fill((255, 255, 255, 10))
+                screen.blit(rb, (margin, y))
 
-            row_color = (240, 200, 60) if rank == 1 else (210, 210, 210) if rank <= 3 else (160, 160, 165)
+            if rank == 1:   row_col = (240, 200, 55)
+            elif rank == 2: row_col = (200, 200, 205)
+            elif rank == 3: row_col = (190, 138, 75)
+            else:           row_col = (142, 142, 148)
+
             kc = kind_colors.get(rec.kind, WHITE)
-
-            # Цветной квадрат вида
-            sw_rect = pygame.Rect(col_xs[0], y + 1, 16, row_h - 4)
-            pygame.draw.rect(screen, tuple(min(255, v) for v in rec.color[:3]), sw_rect, border_radius=3)
-            pygame.draw.rect(screen, (200, 200, 200), sw_rect, 1, border_radius=3)
+            sw_r = pygame.Rect(col_xs[0], y + 2, 14, row_h - 4)
+            pygame.draw.rect(screen, tuple(min(255, v) for v in rec.color[:3]), sw_r, border_radius=3)
+            pygame.draw.rect(screen, (175, 175, 175), sw_r, 1, border_radius=3)
 
             def cell(text, xi, color):
-                s = fs.render(str(text), True, color)
-                screen.blit(s, (xi, y))
+                screen.blit(fs.render(str(text), True, color), (xi, y))
 
-            cell(str(rank), col_xs[0] + 20, row_color)
-            cell(rec.name[:24], col_xs[1], row_color)
+            cell(str(rank), col_xs[0] + 18, row_col)
+            cell(rec.name[:24], col_xs[1], row_col)
             cell(rec.kind_label, col_xs[2], kc)
             cell(rec.peak_pop, col_xs[3], WHITE)
             cell(rec.lifespan, col_xs[4], LIGHT_GRAY)
@@ -107,36 +99,31 @@ def draw_hall_of_fame(screen, sim: Simulation, layout: Layout, fonts) -> pygame.
             cell(rec.total_kills, col_xs[6], ORANGE)
             cell(f"{rec.avg_speed:.1f} / {rec.avg_vision:.1f} / {rec.avg_size:.1f}", col_xs[7], LIGHT_GRAY)
             cell(rec.score, col_xs[8], GOLD)
-
             y += row_h
 
-    # Кнопка рестарта с пульсацией
     btn_w, btn_h = 280, 46
     btn_x = cx - btn_w // 2
     btn_y = sh - btn_h - 28
     btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
-
-    pulse = int(abs(math.sin(pygame.time.get_ticks() / 700)) * 35)
-    btn_col = (50 + pulse, 130 + pulse // 2, 50 + pulse)
+    pulse = int(abs(math.sin(pygame.time.get_ticks() / 700)) * 30)
+    btn_col = (45 + pulse, 125 + pulse // 2, 45 + pulse)
+    pygame.draw.rect(screen, (14, 16, 28), btn_rect.inflate(4, 4), border_radius=11)
     pygame.draw.rect(screen, btn_col, btn_rect, border_radius=9)
-    pygame.draw.rect(screen, WHITE, btn_rect, 2, border_radius=9)
-
+    pygame.draw.rect(screen, WHITE, btn_rect, 1, border_radius=9)
     btn_lbl = fb.render("ПЕРЕЗАПУСТИТЬ", True, WHITE)
     screen.blit(btn_lbl, (cx - btn_lbl.get_width() // 2,
                            btn_y + (btn_h - btn_lbl.get_height()) // 2))
-
-    hint = fs.render("или нажмите  R", True, (120, 120, 120))
-    screen.blit(hint, (cx - hint.get_width() // 2, btn_y + btn_h + 6))
+    hint_s = fs.render("или нажмите  R", True, (90, 92, 115))
+    screen.blit(hint_s, (cx - hint_s.get_width() // 2, btn_y + btn_h + 6))
 
     return btn_rect
 
 
+# ─── Главный рендер ───────────────────────────────────────────────────────────
+
 def draw_all(screen, sim: Simulation, layout: Layout, fonts,
              speed_sl: Slider, param_sliders: list):
-    """Отрисовать весь кадр: мировое поле + информационная панель.
-
-    Возвращает pygame.Rect кнопки рестарта если активен зал славы, иначе None.
-    """
+    """Отрисовать весь кадр. Возвращает Rect кнопки рестарта или None."""
     if sim.game_over:
         return draw_hall_of_fame(screen, sim, layout, fonts)
 
@@ -155,324 +142,404 @@ def draw_all(screen, sim: Simulation, layout: Layout, fonts,
     for sc in sim.scavs:   sc.draw(world_surf)
     for om in sim.omnis:   om.draw(world_surf)
     for pr in sim.preds:   pr.draw(world_surf)
-    pygame.draw.rect(screen, GRAY, (0, 0, L.world_w, L.world_h), 2)
 
-    # Сезонный баннер и прогресс-бар
-    banner = fs.render(f"  {sname}  ", True, BLACK)
-    bw, bh = banner.get_width() + 4, banner.get_height() + 2
-    pygame.draw.rect(world_surf, s_color, (4, 4, bw, bh), border_radius=4)
-    world_surf.blit(banner, (6, 5))
+    pygame.draw.rect(screen, PANEL_LINE, (0, 0, L.world_w, L.world_h), 2)
+
+    # Сезонный баннер
+    bnr = fs.render(f"  {sname}  ", True, BLACK)
+    bw, bh = bnr.get_width() + 4, bnr.get_height() + 6
+    bsurf = pygame.Surface((bw, bh), pygame.SRCALPHA)
+    r, g, b = s_color
+    pygame.draw.rect(bsurf, (r, g, b, 220), (0, 0, bw, bh), border_radius=5)
+    bsurf.blit(bnr, (2, 3))
+    world_surf.blit(bsurf, (6, 6))
     prog_w = int(bw * sim.season_progress)
-    pygame.draw.rect(world_surf, (0, 0, 0, 120), (4, bh + 6, bw, 4), border_radius=2)
+    pygame.draw.rect(world_surf, (0, 0, 0, 80), (6, bh + 8, bw, 3), border_radius=1)
     if prog_w > 0:
-        pygame.draw.rect(world_surf, s_color, (4, bh + 6, prog_w, 4), border_radius=2)
+        pygame.draw.rect(world_surf, s_color, (6, bh + 8, prog_w, 3), border_radius=1)
+
+    tck_s = fs.render(f"тик {sim.tick}", True, (130, 138, 165))
+    world_surf.blit(tck_s, (L.world_w - tck_s.get_width() - 8, 8))
 
     # ── Панель ───────────────────────────────────────────────────────────────
     panel = screen.subsurface((L.panel_x, 0, L.panel_w, L.sh))
     panel.fill(PANEL_BG)
-    px, py = 8, 8
-    pw = L.panel_w - px * 2
+    pygame.draw.line(panel, ACCENT, (0, 0), (0, L.sh), 3)
+    px, py = 10, 0
+    pw = L.panel_w - px - 8
 
-    def txt(s, color, f=None, indent=0):
+    # ── Заголовок ────────────────────────────────────────────────────────────
+    HDR_H = 50
+    pygame.draw.rect(panel, PANEL_SECTION, (0, 0, L.panel_w, HDR_H))
+    pygame.draw.rect(panel, PANEL_LINE,    (0, HDR_H, L.panel_w, 1))
+
+    title_s = fb.render("ЭВОЛЮЦИЯ", True, WHITE)
+    panel.blit(title_s, (px, 7))
+
+    if sim.paused:
+        st_str, st_col = f"тик {sim.tick}  ⏸ ПАУЗА", YELLOW
+    else:
+        st_str, st_col = f"тик {sim.tick}  ▶ {int(10 * speed_sl.value)} тик/с", (95, 215, 105)
+    panel.blit(fs.render(st_str, True, st_col), (px, 7 + title_s.get_height() + 3))
+
+    year = sim.tick // (SEASON_TICKS * 4) + 1
+    yr_s = fs.render(f"Год {year}", True, TEXT_DIM)
+    panel.blit(yr_s, (L.panel_w - yr_s.get_width() - 8, 18))
+
+    py = HDR_H + 2
+
+    # ── Вкладки ──────────────────────────────────────────────────────────────
+    TABS = [("ИНФО", "INFO"), ("ВИДЫ", "SPECIES"), ("НАСТР", "SETTINGS"),
+            ("ГРАФ", "GRAPH"), ("ОБЪЕКТ", "INSPECTOR")]
+    TAB_H = 26
+    tw = L.panel_w // len(TABS)
+    for i, (name, tid) in enumerate(TABS):
+        tx = i * tw
+        active = (sim.ui_tab == tid)
+        pygame.draw.rect(panel, PANEL_SECTION if active else PANEL_BG,
+                         (tx, py, tw, TAB_H))
+        if active:
+            pygame.draw.rect(panel, ACCENT, (tx, py + TAB_H - 2, tw, 2))
+        elif i > 0:
+            pygame.draw.line(panel, PANEL_LINE, (tx, py + 4), (tx, py + TAB_H - 4))
+        t_s = fs.render(name, True, WHITE if active else TEXT_DIM)
+        panel.blit(t_s, (tx + (tw - t_s.get_width()) // 2,
+                          py + (TAB_H - t_s.get_height()) // 2))
+    py += TAB_H
+    pygame.draw.line(panel, PANEL_LINE, (0, py), (L.panel_w, py))
+    py += 8
+
+    # ── Вспомогательные функции ───────────────────────────────────────────────
+    def txt(s, color=LIGHT_GRAY, f=None, indent=0):
         nonlocal py
+        if py > L.sh - 55: return
         surf = (f or fs).render(s, True, color)
         panel.blit(surf, (px + indent, py))
         py += surf.get_height() + 2
 
-    def hline(gap=3):
+    def gap(n=5):
         nonlocal py
-        py += gap
-        pygame.draw.line(panel, GRAY, (px, py), (L.panel_w - px, py))
-        py += gap + 2
+        py += n
 
-    txt("СИМУЛЯТОР ЭВОЛЮЦИИ", WHITE, fb)
-    txt(f"Тик: {sim.tick}  {'⏸ ПАУЗА' if sim.paused else '▶ работает'}", LIGHT_GRAY)
-    hline(4)
+    def section(title, color=ACCENT):
+        nonlocal py
+        py += 5
+        if py > L.sh - 55: return
+        pygame.draw.rect(panel, color, (px, py, 3, fs.get_height() + 2))
+        panel.blit(fs.render(title, True, color), (px + 7, py))
+        py += fs.get_height() + 2
+        pygame.draw.line(panel, PANEL_LINE, (px, py), (L.panel_w - 8, py))
+        py += 6
 
-    # Вкладки
-    tabs = [("ИНФО", "INFO"), ("ВИДЫ", "SPECIES"), ("НАСТР", "SETTINGS"),
-            ("ГРАФ", "GRAPH"), ("ОБЪЕКТ", "INSPECTOR")]
-    tab_h = 28
-    tw = L.panel_w // len(tabs)
-    for i, (name, tid) in enumerate(tabs):
-        tx = i * tw
-        rect = pygame.Rect(tx, py, tw, tab_h)
-        active = (sim.ui_tab == tid)
-        pygame.draw.rect(panel, (40, 45, 70) if active else (20, 22, 35), rect)
-        pygame.draw.rect(panel, GRAY if active else (50, 50, 60), rect, 1)
-        t_surf = fs.render(name, True, WHITE if active else LIGHT_GRAY)
-        panel.blit(t_surf, (tx + (tw - t_surf.get_width()) // 2,
-                             py + (tab_h - t_surf.get_height()) // 2))
-    py += tab_h + 10
+    def pop_bar(label, count, max_count, color):
+        nonlocal py
+        if py > L.sh - 55: return
+        rh = fs.get_height() + 5
+        cy = py + rh // 2
+        pygame.draw.circle(panel, color, (px + 5, cy), 4)
+        panel.blit(fs.render(label, True, LIGHT_GRAY), (px + 13, py + (rh - fs.get_height()) // 2))
+        bar_x, bar_w, bar_h = px + 108, pw - 108 - 30, 5
+        pygame.draw.rect(panel, (22, 26, 48), (bar_x, cy - 2, bar_w, bar_h), border_radius=2)
+        if max_count > 0 and count > 0:
+            fw = max(2, int(bar_w * min(1.0, count / max_count)))
+            pygame.draw.rect(panel, color, (bar_x, cy - 2, fw, bar_h), border_radius=2)
+        cs = fs.render(str(count), True, color if count else TEXT_DIM)
+        panel.blit(cs, (px + pw - cs.get_width(), py + (rh - cs.get_height()) // 2))
+        py += rh
 
-    # ── Содержимое активной вкладки ───────────────────────────────────────────
+    def stat2(left, lc, right, rc):
+        nonlocal py
+        if py > L.sh - 55: return
+        ls = fs.render(left, True, lc)
+        rs = fs.render(right, True, rc)
+        panel.blit(ls, (px, py))
+        panel.blit(rs, (px + pw // 2, py))
+        py += ls.get_height() + 3
+
+    # ── INFO ──────────────────────────────────────────────────────────────────
     if sim.ui_tab == "INFO":
-        year    = sim.tick // (SEASON_TICKS * 4) + 1
-        s_idx   = sim.season_idx
-        season_row = f"Год {year}  |  "
-        for i, (sn, *_rest) in enumerate(SEASONS):
-            season_row += f"[{sn}]" if i == s_idx else f" {sn} "
-        txt(season_row, s_color)
-        hline()
+        s_idx = sim.season_idx
+        cell_w = pw // 4
+        for i, (sn, *_, sc) in enumerate(SEASONS):
+            active = (i == s_idx)
+            bx = px + i * cell_w
+            r2, g2, b2 = sc
+            bg2 = (r2 // 3, g2 // 3, b2 // 3) if active else (r2 // 7, g2 // 7, b2 // 7)
+            pygame.draw.rect(panel, bg2, (bx, py, cell_w - 2, 18), border_radius=4)
+            if active:
+                pygame.draw.rect(panel, sc, (bx, py, cell_w - 2, 18), 1, border_radius=4)
+            sns = fs.render(sn, True, sc if active else TEXT_DIM)
+            panel.blit(sns, (bx + (cell_w - sns.get_width()) // 2, py + 2))
+        py += 22
+        prog_w2 = int(pw * sim.season_progress)
+        pygame.draw.rect(panel, PANEL_LINE, (px, py, pw, 3), border_radius=1)
+        if prog_w2 > 0:
+            pygame.draw.rect(panel, s_color, (px, py, prog_w2, 3), border_radius=1)
+        py += 9
 
-        py += 10
-        tps = int(10 * speed_sl.value)
-        speed_sl.draw_full(panel, L.panel_x, px, py, pw - 4, fs,
-                           extra=f"  ({tps} тик/с)")
-        py += 18
-        hline()
+        section("СКОРОСТЬ")
+        speed_sl.draw_compact(panel, L.panel_x, px, py, pw, fs)
+        py += 22
 
-        txt(f"Травоядные: {len(sim.herbs):>4}", GREEN)
-        txt(f"Хищники:    {len(sim.preds):>4}", RED)
-        txt(f"Падальщики: {len(sim.scavs):>4}", BROWN)
-        txt(f"Всеядные:   {len(sim.omnis):>4}", GOLD)
-        txt(f"Трупы:      {len(sim.corpses):>4}", GRAY)
-        txt(f"Растения:   {len(sim.plants):>4}", (80, 200, 80))
-        hline(2)
+        section("ПОПУЛЯЦИЯ")
+        max_pop = max(len(sim.herbs), len(sim.preds), len(sim.scavs), len(sim.omnis), 1)
+        pop_bar("Травоядные", len(sim.herbs), max_pop, GREEN)
+        pop_bar("Хищники",    len(sim.preds), max_pop, RED)
+        pop_bar("Падальщики", len(sim.scavs), max_pop, BROWN)
+        pop_bar("Всеядные",   len(sim.omnis), max_pop, GOLD)
+        gap(2)
+        txt(f"Растений: {len(sim.plants)}    Трупов: {len(sim.corpses)}", TEXT_DIM)
 
         def avg(seq, attr):
             return sum(getattr(a, attr) for a in seq) / len(seq) if seq else 0.0
 
-        txt("СРЕДНИЕ ПОКАЗАТЕЛИ:", WHITE)
-        txt(f"Трав: ск.{avg(sim.herbs,'speed'):.2f} зр.{avg(sim.herbs,'vision'):.1f} пок.{avg(sim.herbs,'generation'):.1f}", GREEN)
-        txt(f"Хищн: ск.{avg(sim.preds,'speed'):.2f} зр.{avg(sim.preds,'vision'):.1f} пок.{avg(sim.preds,'generation'):.1f}", RED)
-        if sim.scavs:
-            txt(f"Пад:  ск.{avg(sim.scavs,'speed'):.2f} зр.{avg(sim.scavs,'vision'):.1f} пок.{avg(sim.scavs,'generation'):.1f}", BROWN)
-        if sim.omnis:
-            txt(f"Всеяд: ск.{avg(sim.omnis,'speed'):.2f} зр.{avg(sim.omnis,'vision'):.1f} пок.{avg(sim.omnis,'generation'):.1f}", GOLD)
-        hline(2)
-
-        txt(f"Рождений трав.: {sim.total_births_h}", (80, 220, 80))
-        txt(f"Рождений хищн.: {sim.total_births_p}", PINK)
-        txt(f"Рождений пад.:  {sim.total_births_s}", BROWN)
-        txt(f"Рождений всеяд: {sim.total_births_o}", GOLD)
-        txt(f"Смертей:        {sim.total_deaths}",   GRAY)
-        txt(f"Убийств:        {sim.total_kills}",    ORANGE)
-        txt(f"Видообраз.:     {sim.total_speciations}", CYAN)
-        hline(2)
-
-        txt("ПОСЛЕДНИЕ СОБЫТИЯ:", WHITE)
-        for ev in reversed(sim.events[-12:]):
-            if py > L.sh - 110: break
-            alpha = min(255, ev[2] * 2)
-            c = tuple(min(255, int(ch * alpha / 255)) for ch in ev[1])
-            panel.blit(fs.render(ev[0][:46], True, c), (px, py))
-            py += 15
-
-        py = L.sh - 100
-        hline(2)
-        for key, desc in [
-            ("ПРОБЕЛ", "пауза"),   ("F11",  "полный экран"),
-            ("Н",      "+трав."),  ("Х",    "+хищн."),
-            ("С",      "+пад."),   ("R",    "рестарт"),
-            ("Q",      "выход"),
+        section("СРЕДНИЕ ПОКАЗАТЕЛИ")
+        for seq, color, lbl in [
+            (sim.herbs, GREEN, "Трав"),
+            (sim.preds, RED,   "Хищн"),
+            (sim.scavs, BROWN, "Пад "),
+            (sim.omnis, GOLD,  "Всеяд"),
         ]:
-            sk = fs.render(key, True, YELLOW)
-            sd = fs.render(f"  {desc}", True, GRAY)
-            panel.blit(sk, (px, py)); panel.blit(sd, (px + sk.get_width(), py))
+            if seq:
+                txt(f"{lbl}  ск{avg(seq,'speed'):.2f}  зр{avg(seq,'vision'):.1f}"
+                    f"  рз{avg(seq,'size'):.1f}  пок{avg(seq,'generation'):.0f}", color)
+
+        section("СТАТИСТИКА")
+        total_b = (sim.total_births_h + sim.total_births_p
+                   + sim.total_births_s + sim.total_births_o)
+        stat2(f"Рождений: {total_b}", (115, 220, 115),
+              f"Смертей: {sim.total_deaths}", GRAY)
+        stat2(f"Убийств:  {sim.total_kills}", ORANGE,
+              f"Видообр.: {sim.total_speciations}", CYAN)
+
+        section("СОБЫТИЯ")
+        for ev in reversed(sim.events[-9:]):
+            if py > L.sh - 100: break
+            alpha = min(255, ev[2] * 3)
+            c = tuple(min(255, int(ch * alpha / 255)) for ch in ev[1])
+            panel.blit(fs.render("· " + ev[0][:44], True, c), (px, py))
             py += 14
 
+        # Управление — фиксированная нижняя панель
+        ctrl_y = L.sh - 78
+        pygame.draw.rect(panel, PANEL_SECTION, (0, ctrl_y - 5, L.panel_w, L.sh))
+        pygame.draw.line(panel, PANEL_LINE, (0, ctrl_y - 5), (L.panel_w, ctrl_y - 5))
+        ctrls = [
+            ("ПРОБЕЛ", "пауза"),  ("R",     "рестарт"),
+            ("Н",      "+трав."), ("Х",     "+хищн."),
+            ("С",      "+пад."),  ("F11",   "экран"),
+            ("Q/ESC",  "выход"),
+        ]
+        for i, (key, desc) in enumerate(ctrls):
+            bx = px + (i % 2) * (pw // 2)
+            ky = ctrl_y + (i // 2) * 14
+            ks = fs.render(key, True, YELLOW)
+            ds = fs.render(f" {desc}", True, TEXT_DIM)
+            panel.blit(ks, (bx, ky))
+            panel.blit(ds, (bx + ks.get_width(), ky))
+
+    # ── SETTINGS ─────────────────────────────────────────────────────────────
     elif sim.ui_tab == "SETTINGS":
-        txt("НАСТРОЙКИ СИМУЛЯЦИИ:", WHITE)
-        py += 10
-        for sl in param_sliders:
-            sl.draw_compact(panel, L.panel_x, px, py, pw, fs)
-            py += 30
-        hline()
-        txt("Настройки применяются мгновенно.", GRAY)
+        txt("ПАРАМЕТРЫ СИМУЛЯЦИИ", WHITE, fb)
+        gap(6)
+        groups = [
+            ("ГЕНЕТИКА",  [0, 1],   (100, 220, 120)),
+            ("ЭКОЛОГИЯ",  [2, 3, 4], (100, 175, 255)),
+            ("ЭВОЛЮЦИЯ",  [5],       CYAN),
+        ]
+        for g_title, indices, g_color in groups:
+            section(g_title, g_color)
+            for i in indices:
+                param_sliders[i].draw_compact(panel, L.panel_x, px, py, pw, fs)
+                py += 28
+        gap(8)
+        txt("Изменения применяются мгновенно.", TEXT_DIM)
 
+    # ── SPECIES ───────────────────────────────────────────────────────────────
     elif sim.ui_tab == "SPECIES":
-        txt("СПИСОК ЖИВЫХ ВИДОВ И ПОДВИДОВ:", WHITE)
-        txt("(группировка по названию и уровню мутаций)", GRAY)
-        hline()
-
-        thresh = int(param_sliders[5].value)   # порог видообразования из слайдера
+        txt("ЖИВЫЕ ВИДЫ И ПОДВИДЫ", WHITE, fb)
+        gap(4)
+        thresh = int(param_sliders[5].value)
 
         def sp_stats(grp):
-            if not grp: return None
-            n  = len(grp)
-            sp = sum(a.speed      for a in grp) / n
-            sz = sum(a.size       for a in grp) / n
-            vs = sum(a.vision     for a in grp) / n
-            ec = sum(a.ecost      for a in grp) / n
-            en = sum(a.endurance  for a in grp) / n
-            dt = sum(a.diet       for a in grp) / n
-            gn = sum(a.generation for a in grp) / n
-            dl = "трав" if dt <= DIET_HERB_THRESH else ("хищн" if dt >= DIET_CARN_THRESH else "всеяд")
-            return sp, sz, vs, ec, en, dl, gn
+            n = len(grp)
+            return (
+                sum(a.speed for a in grp) / n,
+                sum(a.size for a in grp) / n,
+                sum(a.vision for a in grp) / n,
+                sum(a.generation for a in grp) / n,
+                sum(a.endurance for a in grp) / n,
+            )
 
         def get_subgroups(entities):
             groups = {}
             for e in entities:
                 key = (e.species_name, e.mutation_count)
-                if key not in groups: groups[key] = []
-                groups[key].append(e)
+                groups.setdefault(key, []).append(e)
             return sorted(groups.items(), key=lambda x: (x[0][0], -x[0][1]))
-
-        h_active  = get_subgroups(sim.herbs)
-        p_active  = get_subgroups(sim.preds)
-        sc_active = get_subgroups(sim.scavs)
-        om_active = get_subgroups(sim.omnis)
-        all_sp    = h_active + p_active + sc_active + om_active
-
-        def prey_labels(grp):
-            if not grp: return ""
-            asiz = sum(a.size for a in grp) / len(grp)
-            adt  = sum(a.diet for a in grp) / len(grp)
-            targets = []
-            if adt <= DIET_CARN_THRESH: targets.append("Растения")
-            if adt >= DIET_HERB_THRESH:
-                for (name, mc), sg in all_sp:
-                    if not sg or name == grp[0].species_name: continue
-                    if asiz >= (sum(a.size for a in sg) / len(sg)) * 0.65:
-                        if name not in targets: targets.append(name)
-            return ("→ " + ", ".join(targets[:4])) if targets else ""
 
         def draw_species_block(active, label_color):
             nonlocal py
             for (name, mc), grp in active:
-                if py > L.sh - 60: break
-                t = sp_stats(grp)
-                prey_str = prey_labels(grp)
+                if py > L.sh - 70: break
                 if mc > 0:
-                    txt(f"  ПОДВИД {name}: {len(grp)}", label_color)
+                    txt(f"  · {name}  ×{len(grp)}", label_color)
                     prog = min(1.0, mc / thresh)
-                    bar_w = 120
-                    pygame.draw.rect(panel, (30, 30, 45), (px + 10, py + 2, bar_w, 4))
-                    pygame.draw.rect(panel, CYAN, (px + 10, py + 2, int(bar_w * prog), 4))
-                    txt(f"    Прогресс вида: {mc}/{thresh}", (100, 200, 255), f=fs, indent=120)
+                    pygame.draw.rect(panel, (28, 32, 54), (px + 8, py, 100, 4))
+                    pygame.draw.rect(panel, CYAN, (px + 8, py, int(100 * prog), 4))
+                    mc_s = fs.render(f"мут {mc}/{thresh}", True, (75, 160, 218))
+                    panel.blit(mc_s, (px + 112, py - 1))
+                    py += 7
                 else:
-                    txt(f"  ВИД {name}: {len(grp)}", WHITE)
-                if t:
-                    sp2, sz2, vs2, ec2, en2, dl2, gn2 = t
-                    en_str = f" вын:{en2:.2f}" if en2 > 0.05 else ""
-                    first = grp[0]
-                    def dev(val, base):
-                        d = val - base
-                        return f"{'+' if d >= 0 else ''}{d:.2f}"
-                    txt(f"    ск:{sp2:.1f}({dev(sp2, first.base_speed)}) "
-                        f"рз:{sz2:.1f}({dev(sz2, first.base_size)}) "
-                        f"зр:{vs2:.0f}({dev(vs2, first.base_vision)})", GRAY)
-                    txt(f"    тип:{dl2} пок:{gn2:.0f} е:{ec2:.2f}{en_str}", GRAY)
-                if prey_str:
-                    txt(f"    {prey_str}", (120, 120, 120))
-                py += 6
+                    txt(f"  {name}  ×{len(grp)}", WHITE)
+                t = sp_stats(grp)
+                sp2, sz2, vs2, gn2, en2 = t
+                txt(f"    ск:{sp2:.1f}  зр:{vs2:.0f}  рз:{sz2:.1f}  пок:{gn2:.0f}", GRAY)
+                gap(3)
 
-        if h_active:  txt(f"ТРАВОЯДНЫЕ ({len(h_active)} групп):", GREEN);  draw_species_block(h_active,  LIGHT_GRAY)
-        if p_active:  txt(f"ХИЩНИКИ ({len(p_active)} групп):", RED);        draw_species_block(p_active,  LIGHT_GRAY)
-        if sc_active: txt(f"ПАДАЛЬЩИКИ ({len(sc_active)} групп):", BROWN);  draw_species_block(sc_active, LIGHT_GRAY)
-        if om_active: txt(f"ВСЕЯДНЫЕ ({len(om_active)} групп):", GOLD);     draw_species_block(om_active, LIGHT_GRAY)
+        for population, label, color in [
+            (sim.herbs, "ТРАВОЯДНЫЕ", GREEN),
+            (sim.preds, "ХИЩНИКИ",    RED),
+            (sim.scavs, "ПАДАЛЬЩИКИ", BROWN),
+            (sim.omnis, "ВСЕЯДНЫЕ",   GOLD),
+        ]:
+            groups = get_subgroups(population)
+            if groups:
+                section(f"{label}  ({len(groups)})", color)
+                draw_species_block(groups, LIGHT_GRAY)
 
+    # ── GRAPH ─────────────────────────────────────────────────────────────────
     elif sim.ui_tab == "GRAPH":
-        txt("ДИНАМИКА ПОПУЛЯЦИИ:", WHITE)
-        hline()
-        py += 20
-        graph_h = 240
+        txt("ДИНАМИКА ПОПУЛЯЦИИ", WHITE, fb)
+        gap(4)
+        graph_h = min(220, L.sh // 3)
         graph_w = pw
         graph_y = py
-        pygame.draw.rect(panel, (8, 8, 18), (px, py, graph_w, graph_h))
+        pygame.draw.rect(panel, (7, 8, 20), (px, py, graph_w, graph_h))
 
-        def draw_graph(data, color, max_v):
+        max_v = max(
+            max(sim.history["h"] or [1]),
+            max(sim.history["p"] or [1]),
+            max(sim.history["s"] or [0]),
+            max(sim.history["o"] or [0]), 1)
+
+        for frac in (0.25, 0.5, 0.75):
+            gy = graph_y + int(graph_h * (1 - frac))
+            pygame.draw.line(panel, (22, 28, 50), (px, gy), (px + graph_w, gy))
+            lv = fs.render(str(int(max_v * frac)), True, (48, 54, 80))
+            panel.blit(lv, (px + 2, gy - lv.get_height()))
+
+        def draw_graph(data, color):
             if len(data) < 2 or max_v == 0: return
             step = graph_w / (len(data) - 1)
-            pts  = []
+            pts = []
             for i, v in enumerate(data):
                 gx = px + int(i * step)
                 gy = max(graph_y, min(graph_y + graph_h,
                                       graph_y + graph_h - int(v / max_v * graph_h)))
                 pts.append((gx, gy))
-            pygame.draw.lines(panel, color, False, pts, 3)
+            pygame.draw.lines(panel, color, False, pts, 2)
+            if pts:
+                pygame.draw.circle(panel, color, pts[-1], 4)
 
-        max_v = max(max(sim.history["h"] or [1]), max(sim.history["p"] or [1]),
-                    max(sim.history["s"] or [0]), max(sim.history["o"] or [0]), 1)
-        draw_graph(sim.history["h"], GREEN, max_v)
-        draw_graph(sim.history["p"], RED,   max_v)
-        draw_graph(sim.history["s"], BROWN, max_v)
-        draw_graph(sim.history["o"], GOLD,  max_v)
-        pygame.draw.rect(panel, GRAY, (px, graph_y, graph_w, graph_h), 1)
-
+        draw_graph(sim.history["h"], GREEN)
+        draw_graph(sim.history["p"], RED)
+        draw_graph(sim.history["s"], BROWN)
+        draw_graph(sim.history["o"], GOLD)
+        pygame.draw.rect(panel, PANEL_LINE, (px, graph_y, graph_w, graph_h), 1)
         py += graph_h + 10
-        txt("Легенда:", WHITE)
-        txt(" ● Зеленый: Травоядные",   GREEN)
-        txt(" ● Красный: Хищники",       RED)
-        txt(" ● Коричневый: Падальщики", BROWN)
-        txt(" ● Золотой: Всеядные",      GOLD)
-        py += 20
-        txt(f"Макс. популяция на графике: {int(max_v)}", LIGHT_GRAY)
 
+        section("ТЕКУЩИЕ ЗНАЧЕНИЯ")
+        for color, name, data in [
+            (GREEN, "Травоядные", sim.history["h"]),
+            (RED,   "Хищники",    sim.history["p"]),
+            (BROWN, "Падальщики", sim.history["s"]),
+            (GOLD,  "Всеядные",   sim.history["o"]),
+        ]:
+            cur = data[-1] if data else 0
+            stat2(f"● {name}", color, str(cur), color)
+        gap(6)
+        txt(f"Макс. на графике: {int(max_v)}", TEXT_DIM)
+
+    # ── INSPECTOR ─────────────────────────────────────────────────────────────
     elif sim.ui_tab == "INSPECTOR":
-        txt("ИНСПЕКТОР ОБЪЕКТА:", WHITE)
-        hline()
+        txt("ИНСПЕКТОР", WHITE, fb)
         obj = sim.selected_animal
         if not obj:
-            txt("Никто не выбран", GRAY)
-            txt("Кликните по животному в мире,", GRAY)
-            txt("чтобы увидеть его статы.", GRAY)
+            gap(14)
+            txt("Животное не выбрано", GRAY)
+            gap(4)
+            txt("Кликните по животному в мире", TEXT_DIM)
+            txt("чтобы увидеть подробности.", TEXT_DIM)
         else:
-            kind_colors = {"Herbivore": GREEN, "Predator": RED, "Scavenger": BROWN, "Omnivore": GOLD}
+            kind_colors = {"Herbivore": GREEN, "Predator": RED,
+                           "Scavenger": BROWN, "Omnivore": GOLD}
             k_name = type(obj).__name__
-            alive_color = WHITE if obj.alive else GRAY
+            kc = kind_colors.get(k_name, WHITE)
 
-            txt(f"ВИД: {obj.species_name}",
-                kind_colors.get(k_name, WHITE) if obj.alive else GRAY, fb)
+            gap(4)
+            txt(obj.species_name, kc if obj.alive else GRAY, fb)
             if not obj.alive:
-                txt("СТАТУС: ПОГИБ", RED, fb)
+                txt("† ПОГИБ", RED)
+            else:
+                txt(f"{k_name}  ·  {obj.diet_label}  ·  пок. {obj.generation}", TEXT_DIM)
+                st_c = CYAN if obj.state == "бежит" else (
+                    ORANGE if "охотится" in obj.state else kc)
+                txt(f"Состояние: {obj.state}", st_c)
 
-            txt(f"Тип: {k_name} ({obj.diet_label})", LIGHT_GRAY)
-            txt(f"Поколение: {obj.generation}", alive_color)
-            hline()
+            section("РЕСУРСЫ")
 
-            if obj.alive:
-                st_color = CYAN if obj.state == "бежит" else (ORANGE if obj.state == "охотится" else WHITE)
-                txt(f"Состояние: {obj.state}", st_color)
-
-            def draw_stat_bar(label, val, maxi, color):
+            def stat_bar(label, val, maxi, color):
                 nonlocal py
-                txt(f"{label}: {val:.1f}/{maxi:.0f}", WHITE if obj.alive else GRAY)
-                pygame.draw.rect(panel, (30, 30, 40), (px, py, pw, 6))
-                if obj.alive:
-                    pygame.draw.rect(panel, color,
-                                     (px, py, int(pw * max(0, min(1, val / maxi))), 6))
-                py += 10
+                if py > L.sh - 55: return
+                pct = max(0.0, min(1.0, val / max(1, maxi)))
+                panel.blit(fs.render(f"{label}: {val:.0f} / {maxi:.0f}",
+                                     True, LIGHT_GRAY if obj.alive else GRAY), (px, py))
+                py += fs.get_height() + 2
+                pygame.draw.rect(panel, (20, 24, 46), (px, py, pw, 7), border_radius=3)
+                if obj.alive and pct > 0:
+                    pygame.draw.rect(panel, color, (px, py, int(pw * pct), 7), border_radius=3)
+                py += 11
 
-            draw_stat_bar("Энергия",    obj.energy,    obj.MAX_E,   YELLOW)
-            draw_stat_bar("Жажда",      obj.hydration, obj.MAX_H,   BLUE)
-            draw_stat_bar("Жир (запас)", obj.fat,      obj.MAX_FAT, (200, 200, 100))
+            stat_bar("Энергия",  obj.energy,    obj.MAX_E,   YELLOW)
+            stat_bar("Жажда",    obj.hydration, obj.MAX_H,   BLUE)
+            stat_bar("Жир",      obj.fat,       obj.MAX_FAT, (200, 195, 85))
 
-            fat_ratio = obj.fat / max(1, obj.MAX_FAT)
-            if fat_ratio > 0.1:
-                txt(f"  Эффект: -{fat_ratio*25:.0f}% скор, +{fat_ratio*40:.0f}% расход",
-                    (255, 100, 100))
+            fat_r = obj.fat / max(1, obj.MAX_FAT)
+            if fat_r > 0.1:
+                txt(f"  Жир: -{fat_r*25:.0f}% скор  +{fat_r*40:.0f}% расход",
+                    (220, 100, 100))
+            txt(f"Возраст: {obj.age} / {obj.max_age}", TEXT_DIM)
 
-            py += 5
-            txt(f"Возраст: {obj.age}/{obj.max_age} тик", LIGHT_GRAY)
-            hline()
-
-            txt("ГЕНЕТИЧЕСКИЕ ТРЕЙТЫ:", WHITE)
+            section("ГЕНЕТИКА")
 
             def trait_row(lab, val, base):
+                nonlocal py
+                if py > L.sh - 55: return
                 d = val - base
-                d_str = f"({'+' if d >= 0 else ''}{d:.2f})"
-                txt(f"  {lab}: {val:.2f} {d_str}", LIGHT_GRAY)
+                d_col = (95, 215, 95) if d >= 0 else (215, 90, 90)
+                base_s = fs.render(f"  {lab}: {val:.2f}", True, LIGHT_GRAY)
+                delta_s = fs.render(f" ({'+' if d >= 0 else ''}{d:.2f})", True, d_col)
+                panel.blit(base_s, (px, py))
+                panel.blit(delta_s, (px + base_s.get_width(), py))
+                py += base_s.get_height() + 2
 
             trait_row("Скорость", obj.speed,  obj.base_speed)
             trait_row("Зрение",   obj.vision, obj.base_vision)
             trait_row("Размер",   obj.size,   obj.base_size)
-            txt(f"  Стадность: {obj.herd_instinct:.2f}", LIGHT_GRAY)
+            txt(f"  Стадность:  {obj.herd_instinct:.2f}", LIGHT_GRAY)
+            txt(f"  Выносл.:    {obj.endurance:.2f}", LIGHT_GRAY)
+            txt(f"  Рацион:     {obj.diet:.2f}  ({obj.diet_label})", LIGHT_GRAY)
 
-            vis   = obj.get_visibility(sim.season_idx)
-            vis_p = int(vis * 100)
+            vis = obj.get_visibility(sim.season_idx)
             v_col = GREEN if vis < 0.6 else (YELLOW if vis < 0.9 else RED)
-            txt(f"  Заметность: {vis_p}%", v_col)
+            txt(f"  Заметность: {int(vis*100)}%", v_col)
 
-            txt(f"  Выносливость: {obj.endurance:.2f}", LIGHT_GRAY)
-            txt(f"  Рацион (0-1): {obj.diet:.2f}", LIGHT_GRAY)
-            hline()
+            section("ИСТОРИЯ")
+            txt(f"Детей: {obj.children}    Убийств: {obj.kills}", LIGHT_GRAY)
+            txt(f"Мутаций накоплено: {obj.mutation_count}", CYAN)
 
-            txt(f"Детей: {obj.children}  Убийств: {obj.kills}", WHITE)
-            txt(f"Накоплено мутаций: {obj.mutation_count}", CYAN)
-
-    # Подсветка выбранного животного в мире
+    # Подсветка выбранного животного
     if sim.selected_animal and sim.selected_animal.alive:
         obj = sim.selected_animal
         sx, sy = int(obj.x * CELL), int(obj.y * CELL)
@@ -481,19 +548,27 @@ def draw_all(screen, sim: Simulation, layout: Layout, fonts,
         pygame.draw.circle(world_surf, CYAN,  (sx, sy), r + 4, 1)
 
 
+# ─── Легенда ──────────────────────────────────────────────────────────────────
+
 def draw_legend(screen, layout: Layout, font):
     """Легенда символов в левом нижнем углу мирового поля."""
     items = [
         (GREEN,       "●", "Травоядное"),
         (RED,         "◆", "Хищник"),
-        (BROWN,       "●", "Падальщик (×=труп)"),
+        (BROWN,       "●", "Падальщик"),
         ((0, 160, 0), "●", "Растение"),
         (BLUE,        "■", "Вода"),
     ]
-    x, y = 6, layout.world_h - len(items) * 14 - 8
-    bg = pygame.Surface((170, len(items) * 14 + 8), pygame.SRCALPHA)
-    bg.fill((0, 0, 0, 150))
-    screen.blit(bg, (x - 2, y - 2))
+    lh = font.get_height() + 3
+    bw, bh = 148, len(items) * lh + 10
+    x, y0 = 8, layout.world_h - bh - 8
+
+    bg = pygame.Surface((bw, bh), pygame.SRCALPHA)
+    bg.fill((4, 5, 16, 165))
+    pygame.draw.rect(bg, (*PANEL_LINE, 200), (0, 0, bw, bh), 1, border_radius=5)
+    screen.blit(bg, (x, y0))
+
+    y = y0 + 5
     for color, sym, label in items:
-        screen.blit(font.render(f"{sym} {label}", True, color), (x, y))
-        y += 14
+        screen.blit(font.render(f"{sym} {label}", True, color), (x + 6, y))
+        y += lh
